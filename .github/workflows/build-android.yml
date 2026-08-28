@@ -1,0 +1,149 @@
+name: Build SYSplus Android APK
+
+on:
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: "3.24.5"
+  RUST_VERSION: "1.75"
+  CARGO_NDK_VERSION: "3.1.2"
+  NDK_VERSION: "r25c"
+  VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+
+jobs:
+  build-android:
+    name: Build SYSplus Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake curl gcc-multilib git g++ g++-multilib \
+            libc6-dev libclang-dev llvm-dev nasm ninja-build \
+            openjdk-17-jdk-headless pkg-config wget
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+          add-to-path: true
+
+      - name: Setup vcpkg with binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: /opt/artifacts/vcpkg
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+
+      - name: Install vcpkg dependencies for arm64
+        run: |
+          ./flutter/build_android_deps.sh "arm64-v8a"
+        shell: bash
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: aarch64-linux-android
+          components: "rustfmt"
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: rustdesk-android-arm64
+          key: aarch64-linux-android
+
+      - name: Preconfigure SYSplus Default Servers & Permissions in Flutter
+        env:
+          RENDEZVOUS_SERVER: ${{ vars.RENDEZVOUS_SERVER || secrets.RENDEZVOUS_SERVER || 'rustdesk.sysplus.co' }}
+          RELAY_SERVER: ${{ vars.RELAY_SERVER || secrets.RELAY_SERVER || 'rustdesk.sysplus.co' }}
+          API_SERVER: ${{ vars.API_SERVER || secrets.API_SERVER || 'https://services.sysplus.co/api/v1/rustdesk' }}
+          RS_PUB_KEY: ${{ vars.RS_PUB_KEY || secrets.RS_PUB_KEY || 'uDLIZwKpOnZRD9qKzw5eMW6fe1Pvnc35Wul43YdXjQw=' }}
+        run: |
+          # 1. Reemplazar valores por defecto de ServerConfig en flutter/lib/common.dart
+          sed -i "s|: idServer = options\['custom-rendezvous-server'\] ?? \"\"|: idServer = options['custom-rendezvous-server'] ?? \"$RENDEZVOUS_SERVER\"|g" flutter/lib/common.dart
+          sed -i "s|relayServer = options\['relay-server'\] ?? \"\"|relayServer = options['relay-server'] ?? \"$RELAY_SERVER\"|g" flutter/lib/common.dart
+          sed -i "s|apiServer = options\['api-server'\] ?? \"\"|apiServer = options['api-server'] ?? \"$API_SERVER\"|g" flutter/lib/common.dart
+          sed -i "s|key = options\['key'\] ?? \"\"|key = options['key'] ?? \"$RS_PUB_KEY\"|g" flutter/lib/common.dart
+
+          # 2. Inyectar autoconfiguración de Servidores y Permisos internos en flutter/lib/main.dart
+          python3 -c "
+          with open('flutter/lib/main.dart', 'r') as f:
+              content = f.read()
+          old = 'void runMobileApp() async {'
+          injection = '''void runMobileApp() async {
+            await initEnv(kAppTypeMain);
+            try {
+              if (bind.mainGetOptionSync(key: \"custom-rendezvous-server\").isEmpty) {
+                await bind.mainSetOption(key: \"custom-rendezvous-server\", value: \"$RENDEZVOUS_SERVER\");
+                await bind.mainSetOption(key: \"relay-server\", value: \"$RELAY_SERVER\");
+                await bind.mainSetOption(key: \"api-server\", value: \"$API_SERVER\");
+                await bind.mainSetOption(key: \"key\", value: \"$RS_PUB_KEY\");
+                // Permisos internos activados por defecto
+                await bind.mainSetOption(key: \"allow-file-transfer\", value: \"Y\");
+                await bind.mainSetOption(key: \"allow-clipboard\", value: \"Y\");
+                await bind.mainSetOption(key: \"allow-keyboard\", value: \"Y\");
+                await bind.mainSetOption(key: \"allow-mouse\", value: \"Y\");
+                await bind.mainSetOption(key: \"allow-audio\", value: \"Y\");
+              }
+            } catch (_) {}'''
+          new_content = content.replace(old + '\n  await initEnv(kAppTypeMain);', injection)
+          with open('flutter/lib/main.dart', 'w') as f:
+              f.write(new_content)
+          "
+
+      - name: Generate Flutter Rust Bridge
+        run: |
+          cargo install cargo-expand --version 1.0.95 --locked || true
+          cargo install flutter_rust_bridge_codegen --version 1.80.1 --features "uuid" --locked || true
+          pushd flutter && flutter pub get && popd
+          flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
+
+      - name: Build Rustdesk Native Lib (arm64)
+        env:
+          RENDEZVOUS_SERVER: ${{ vars.RENDEZVOUS_SERVER || secrets.RENDEZVOUS_SERVER || 'rustdesk.sysplus.co' }}
+          RELAY_SERVER: ${{ vars.RELAY_SERVER || secrets.RELAY_SERVER || 'rustdesk.sysplus.co' }}
+          API_SERVER: ${{ vars.API_SERVER || secrets.API_SERVER || 'https://services.sysplus.co/api/v1/rustdesk' }}
+          RS_PUB_KEY: ${{ vars.RS_PUB_KEY || secrets.RS_PUB_KEY || 'uDLIZwKpOnZRD9qKzw5eMW6fe1Pvnc35Wul43YdXjQw=' }}
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          cargo install cargo-ndk --version ${{ env.CARGO_NDK_VERSION }} --locked || true
+          ./flutter/ndk_arm64.sh
+          mkdir -p ./flutter/android/app/src/main/jniLibs/arm64-v8a
+          cp ./target/aarch64-linux-android/release/liblibrustdesk.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/librustdesk.so
+          cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/
+
+      - name: Build Flutter APK
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+          RENDEZVOUS_SERVER: ${{ vars.RENDEZVOUS_SERVER || secrets.RENDEZVOUS_SERVER || 'rustdesk.sysplus.co' }}
+          RELAY_SERVER: ${{ vars.RELAY_SERVER || secrets.RELAY_SERVER || 'rustdesk.sysplus.co' }}
+          API_SERVER: ${{ vars.API_SERVER || secrets.API_SERVER || 'https://services.sysplus.co/api/v1/rustdesk' }}
+          RS_PUB_KEY: ${{ vars.RS_PUB_KEY || secrets.RS_PUB_KEY || 'uDLIZwKpOnZRD9qKzw5eMW6fe1Pvnc35Wul43YdXjQw=' }}
+        run: |
+          export PATH=/usr/lib/jvm/java-17-openjdk-amd64/bin:$PATH
+          # Usar signing config de debug para instalación universal
+          sed -i "s/signingConfigs.release/signingConfigs.debug/g" ./flutter/android/app/build.gradle
+          cd flutter
+          flutter build apk --release --target-platform android-arm64 --split-per-abi
+
+      - name: Upload SYSplus Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Soporte_SYSplus_Android_APK
+          path: flutter/build/app/outputs/flutter-apk/*.apk
