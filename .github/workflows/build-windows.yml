@@ -199,6 +199,26 @@ jobs:
           mkdir -p ./Artifacts
           mv ./target/release/rustdesk-portable-packer.exe ./Artifacts/Soporte_SYSplus.exe
 
+      - name: Sign executable with GlobalSign EV (AWS KMS)
+        if: env.AWS_ACCESS_KEY_ID != ''
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ vars.AWS_REGION || secrets.AWS_REGION || 'us-east-1' }}
+          KEY_ARN: ${{ vars.AWS_KMS_KEY_ARN || secrets.AWS_KMS_KEY_ARN || 'arn:aws:kms:us-east-1:605209706351:key/766380c2-de38-4763-b48a-908f43aaffbd' }}
+        run: |
+          choco install jsign -y
+          Write-Host "Firmando Soporte_SYSplus.exe con GlobalSign EV (AWS KMS)..."
+          jsign --storetype AWS `
+                --keystore $env:AWS_REGION `
+                --alias $env:KEY_ARN `
+                --certfile "res/signTools/OS20260818459558.cer" `
+                --tsaurl "http://timestamp.globalsign.com/tsa/r6advanced1" `
+                --name "SYSplus Soporte Remoto" `
+                "./Artifacts/Soporte_SYSplus.exe"
+          Write-Host "Verificando firma de Authenticode:"
+          Get-AuthenticodeSignature "./Artifacts/Soporte_SYSplus.exe"
+
       - name: Upload SYSplus Windows Executable
         uses: actions/upload-artifact@v4
         with:
