@@ -159,6 +159,11 @@ jobs:
 
       - name: Build RustDesk & Flutter release
         run: |
+          # Asegurar que el Cargo.lock esté sincronizado con el árbol de dependencias
+          cargo update --workspace || true
+          cd libs/virtual_display/dylib
+          cargo update || true
+          cd ../../..
           python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec --vram
           mv ./flutter/build/windows/x64/runner/Release ./rustdesk
 
