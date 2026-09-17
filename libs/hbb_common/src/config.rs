@@ -74,7 +74,12 @@ lazy_static::lazy_static! {
     static ref USER_DEFAULT_CONFIG: RwLock<(UserDefaultConfig, Instant)> = RwLock::new((UserDefaultConfig::load(), Instant::now()));
     pub static ref NEW_STORED_PEER_CONFIG: Mutex<HashSet<String>> = Default::default();
     pub static ref DEFAULT_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
-    pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
+    pub static ref OVERWRITE_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([
+        ("custom-rendezvous-server".to_owned(), "rustdesk.sysplus.co".to_owned()),
+        ("key".to_owned(), RS_PUB_KEY.to_owned()),
+        ("relay-server".to_owned(), "rustdesk.sysplus.co".to_owned()),
+        ("api-server".to_owned(), "https://services.sysplus.co/api/v1/rustdesk".to_owned()),
+    ]));
     pub static ref DEFAULT_DISPLAY_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
     pub static ref OVERWRITE_DISPLAY_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
     pub static ref DEFAULT_LOCAL_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
@@ -83,6 +88,8 @@ lazy_static::lazy_static! {
         ("disable-settings".to_owned(), "Y".to_owned()),
         ("disable-account".to_owned(), "Y".to_owned()),
         ("disable-installation".to_owned(), "Y".to_owned()),
+        ("custom-rendezvous-server".to_owned(), "rustdesk.sysplus.co".to_owned()),
+        ("key".to_owned(), RS_PUB_KEY.to_owned()),
         ("api-server".to_owned(), "https://services.sysplus.co/api/v1/rustdesk".to_owned()),
         ("relay-server".to_owned(), "rustdesk.sysplus.co".to_owned()),
     ]));
