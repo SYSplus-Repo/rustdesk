@@ -85,7 +85,6 @@ lazy_static::lazy_static! {
     pub static ref DEFAULT_LOCAL_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
     pub static ref OVERWRITE_LOCAL_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
     pub static ref HARD_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([
-        ("disable-settings".to_owned(), "Y".to_owned()),
         ("disable-account".to_owned(), "Y".to_owned()),
         ("disable-installation".to_owned(), "Y".to_owned()),
         ("custom-rendezvous-server".to_owned(), "rustdesk.sysplus.co".to_owned()),
@@ -93,7 +92,9 @@ lazy_static::lazy_static! {
         ("api-server".to_owned(), "https://services.sysplus.co/api/v1/rustdesk".to_owned()),
         ("relay-server".to_owned(), "rustdesk.sysplus.co".to_owned()),
     ]));
-    pub static ref BUILTIN_SETTINGS: RwLock<HashMap<String, String>> = Default::default();
+    pub static ref BUILTIN_SETTINGS: RwLock<HashMap<String, String>> = RwLock::new(HashMap::from([
+        ("hide-network-settings".to_owned(), "Y".to_owned()),
+    ]));
 }
 
 #[cfg(target_os = "android")]
