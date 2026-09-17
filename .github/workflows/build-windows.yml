@@ -221,14 +221,7 @@ jobs:
         run: |
           choco install jsign -y
           Write-Host "Firmando Soporte_SYSplus.exe con GlobalSign EV (AWS KMS)..."
-          jsign --storetype AWS `
-                --keystore $env:AWS_REGION `
-                --alias $env:KEY_ARN `
-                --certfile "res/signTools/OS20260818459558.cer" `
-                --tsmode RFC3161 `
-                --tsaurl "http://timestamp.globalsign.com/tsa/r45standard,http://timestamp.digicert.com,http://timestamp.sectigo.com" `
-                --name "SYSplus Soporte Remoto" `
-                "./Artifacts/Soporte_SYSplus.exe"
+          jsign --storetype AWS --keystore "$env:AWS_REGION" --alias "$env:KEY_ARN" --certfile "res/signTools/OS20260818459558.cer" --tsmode RFC3161 --tsaurl "http://timestamp.digicert.com,http://timestamp.globalsign.com/tsa/r45standard,http://timestamp.sectigo.com" --name "SYSplus Soporte Remoto" "./Artifacts/Soporte_SYSplus.exe"
           Write-Host "Verificando firma de Authenticode:"
           Get-AuthenticodeSignature "./Artifacts/Soporte_SYSplus.exe"
 
