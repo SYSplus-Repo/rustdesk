@@ -54,9 +54,12 @@ jobs:
         with:
           name: bridge-artifact
           path: |
-            flutter/lib/generated_bridge.dart
-            flutter/lib/generated_bridge.freezed.dart
-            flutter/macos/Runner/bridge_generated.h
+            ./src/bridge_generated.rs
+            ./src/bridge_generated.io.rs
+            ./flutter/lib/generated_bridge.dart
+            ./flutter/lib/generated_bridge.freezed.dart
+            ./flutter/macos/Runner/bridge_generated.h
+            ./flutter/ios/Runner/bridge_generated.h
 
   build-topmostwindow:
     name: Build TopMostWindow Dependency
