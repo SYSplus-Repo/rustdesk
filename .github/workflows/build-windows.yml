@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  RUST_VERSION: "1.75"
+  RUST_VERSION: "1.81"
   LLVM_VERSION: "15.0.6"
   FLUTTER_VERSION: "3.24.5"
   VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
@@ -159,11 +159,6 @@ jobs:
 
       - name: Build RustDesk & Flutter release
         run: |
-          # Asegurar que el Cargo.lock esté sincronizado con el árbol de dependencias
-          cargo update --workspace || true
-          cd libs/virtual_display/dylib
-          cargo update || true
-          cd ../../..
           python3 .\build.py --portable --flutter --skip-portable-pack --hwcodec --vram
           mv ./flutter/build/windows/x64/runner/Release ./rustdesk
 
