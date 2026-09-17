@@ -225,7 +225,8 @@ jobs:
                 --keystore $env:AWS_REGION `
                 --alias $env:KEY_ARN `
                 --certfile "res/signTools/OS20260818459558.cer" `
-                --tsaurl "http://timestamp.globalsign.com/tsa/r6advanced1" `
+                --tsmode RFC3161 `
+                --tsaurl "http://timestamp.globalsign.com/tsa/r45standard,http://timestamp.digicert.com,http://timestamp.sectigo.com" `
                 --name "SYSplus Soporte Remoto" `
                 "./Artifacts/Soporte_SYSplus.exe"
           Write-Host "Verificando firma de Authenticode:"
